@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -144,10 +145,8 @@ def main() -> None:
     config = get_settings()
 
     commands = {"run": cmd_run, "scrape": cmd_scrape, "list": cmd_list}
-    try:
+    with contextlib.suppress(KeyboardInterrupt):
         asyncio.run(commands[args.command](config))
-    except KeyboardInterrupt:
-        pass
 
 
 if __name__ == "__main__":

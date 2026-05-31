@@ -84,16 +84,16 @@ class MarketAnalyzer:
         """Return 0-100 percentile of listing's price among similar listings (lower = cheaper)."""
         if not similar:
             return 50.0
-        prices = sorted(l.price_pln for l in similar)
+        prices = sorted(item.price_pln for item in similar)
         below = sum(1 for p in prices if p <= listing.price_pln)
         return round((below / len(prices)) * 100, 1)
 
     def compute_inline_avg(self, listings: list) -> dict[str, float]:
         """Compute market averages from the batch itself (no DB needed)."""
         groups: dict[tuple, list[float]] = {}
-        for l in listings:
-            key = (l.make.lower(), l.model.lower(), l.year)
-            groups.setdefault(key, []).append(l.price_pln)
+        for item in listings:
+            key = (item.make.lower(), item.model.lower(), item.year)
+            groups.setdefault(key, []).append(item.price_pln)
         return {
             f"{k[0]}_{k[1]}_{k[2]}": statistics.mean(prices)
             for k, prices in groups.items()

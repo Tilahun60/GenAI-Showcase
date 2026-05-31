@@ -98,7 +98,7 @@ def _lookup_model_scores(make: str, model: str) -> dict[str, float]:
         if m == make_l and mod in model_l:
             return scores
     # Try partial make match
-    for (m, mod), scores in RELIABILITY_DATA.items():
+    for (m, _mod), scores in RELIABILITY_DATA.items():
         if m == make_l:
             return scores
     return DEFAULT_SCORES

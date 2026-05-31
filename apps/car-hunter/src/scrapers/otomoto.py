@@ -133,7 +133,7 @@ class OtomotoScraper(BaseScraper):
             dds = params_container.select("dd")
             dts = params_container.select("dt")
             param_map: dict[str, str] = {}
-            for dt, dd in zip(dts, dds):
+            for dt, dd in zip(dts, dds, strict=False):
                 param_map[dt.get_text(strip=True).lower()] = dd.get_text(strip=True)
 
             year_str = param_map.get("rok produkcji") or param_map.get("year") or ""

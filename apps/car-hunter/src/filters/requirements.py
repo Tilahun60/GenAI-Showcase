@@ -50,15 +50,15 @@ class RequirementsFilter:
         if r.exclude_accident_history and listing.accident_history is True:
             return False
 
-        if r.allowed_seller_types and listing.seller_type.lower() not in r.allowed_seller_types:
-            return False
-
-        return True
+        return not (
+            r.allowed_seller_types
+            and listing.seller_type.lower() not in r.allowed_seller_types
+        )
 
     def filter_batch(
         self, listings: list[CarListingCreate] | list[CarListingRead]
     ) -> list:
-        passed = [l for l in listings if self.matches(l)]
+        passed = [item for item in listings if self.matches(item)]
         logger.info(
             "Requirements filter: %d/%d listings passed",
             len(passed),

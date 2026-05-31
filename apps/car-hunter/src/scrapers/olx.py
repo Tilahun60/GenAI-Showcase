@@ -140,10 +140,7 @@ class OlxScraper(BaseScraper):
         for p in params:
             key = (p.get("key") or "").lower()
             val = p.get("value") or {}
-            if isinstance(val, dict):
-                label = val.get("label") or val.get("key") or ""
-            else:
-                label = str(val)
+            label = val.get("label") or val.get("key") or "" if isinstance(val, dict) else str(val)
             if key and label:
                 param_map[key] = str(label)
 

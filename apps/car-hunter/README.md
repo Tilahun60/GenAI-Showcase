@@ -151,9 +151,22 @@ src/
     └── jobs.py          # APScheduler job definitions
 ```
 
+## Testing
+
+The test suite (`tests/`) covers the pure business logic — scoring, leasing
+math, the requirements filter, market analysis, and scraper HTML/JSON parsing
+against static fixtures (no network calls required).
+
+```bash
+cd apps/car-hunter
+pip install -e ".[dev]"
+pytest -q
+```
+
 ## GitHub Actions
 
-The workflow at `.github/workflows/car-hunter.yml` runs the scrape job every 6 hours.
+The workflow at `.github/workflows/car-hunter.yml` runs lint (ruff) and the
+test suite (pytest) on every push, then the scrape job every 6 hours.
 
 Add secrets in your repository settings:
 - `TELEGRAM_BOT_TOKEN`

@@ -6,12 +6,12 @@ import logging
 import statistics
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.database import CarListing, ScoredListing
+from ..models.database import CarListing
 from ..models.schemas import CarListingCreate, CarListingRead
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ SUSPICIOUS_PRICE_THRESHOLD = 0.70  # flag if < 70% of market avg
 
 
 class MarketAnalyzer:
-    def __init__(self, session: "AsyncSession") -> None:
+    def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     async def get_market_avg(self, make: str, model: str, year: int) -> float | None:

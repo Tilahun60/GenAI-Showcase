@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -72,7 +72,7 @@ class NotificationManager:
         log_entry = AlertLog(
             listing_id=listing.id,
             channel=notifier.channel_name,
-            sent_at=datetime.now(tz=timezone.utc),
+            sent_at=datetime.now(tz=UTC),
             success=success,
             message_preview=preview,
         )
@@ -80,7 +80,7 @@ class NotificationManager:
         await self._db.commit()
 
     async def _already_alerted(self, listing_id, channel: str) -> bool:
-        cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=24)
+        cutoff = datetime.now(tz=UTC) - timedelta(hours=24)
         result = await self._db.execute(
             select(AlertLog).where(
                 AlertLog.listing_id == listing_id,

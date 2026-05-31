@@ -196,8 +196,8 @@ class OtomotoScraper(BaseScraper):
         # Otomoto URLs look like: /osobowe/oferta/toyota-c-hr-hybr-ID123456789.html
         # or https://www.otomoto.pl/osobowe/oferta/ford-kuga-ID987654321.html
         path = urlparse(url).path
-        # Try to find the ID pattern "ID\d+"
-        id_match = re.search(r"ID(\d+)", path)
+        # Otomoto IDs are alphanumeric (e.g. ID6GpXaB), so match word chars after "ID"
+        id_match = re.search(r"ID([A-Za-z0-9]+)", path)
         if id_match:
             return id_match.group(1)
         # Fallback: use last path segment without extension

@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CarListingCreate(BaseModel):
@@ -41,7 +41,7 @@ class CarListingRead(CarListingCreate):
 
 class ScoredListingCreate(BaseModel):
     """Schema for creating a scored listing."""
-    listing_id: uuid.UUID
+    listing_id: uuid.UUID | None = None
     reliability_score: float
     reliability_weight: float = 0.35
     maintenance_score: float
@@ -70,7 +70,7 @@ class ScoredListingRead(ScoredListingCreate):
 
 class LeasingAnalysisCreate(BaseModel):
     """Schema for creating a leasing analysis."""
-    listing_id: uuid.UUID
+    listing_id: uuid.UUID | None = None
     down_payment_pln: float
     monthly_payment_pln: float
     buyout_value_pln: float

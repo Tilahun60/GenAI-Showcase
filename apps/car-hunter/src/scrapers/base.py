@@ -48,7 +48,7 @@ class BaseScraper(ABC):
     def __init__(self) -> None:
         self._client: httpx.AsyncClient | None = None
 
-    async def __aenter__(self) -> "BaseScraper":
+    async def __aenter__(self) -> BaseScraper:
         self._client = httpx.AsyncClient(
             timeout=httpx.Timeout(30.0),
             headers=self._default_headers(),
@@ -163,9 +163,9 @@ class BaseScraper(ABC):
     def _normalize_transmission(self, raw: str) -> str:
         """Normalize transmission string."""
         raw_lower = (raw or "").lower()
-        if "automat" in raw_lower or "automatic" in raw_lower or "at" == raw_lower:
+        if "automat" in raw_lower or "automatic" in raw_lower or raw_lower == "at":
             return "automatic"
-        if "manual" in raw_lower or "mechan" in raw_lower or "mt" == raw_lower:
+        if "manual" in raw_lower or "mechan" in raw_lower or raw_lower == "mt":
             return "manual"
         return raw_lower or "unknown"
 

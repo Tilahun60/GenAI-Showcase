@@ -3,15 +3,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from ..config import Settings
 from ..filters.requirements import Requirements, RequirementsFilter
-from ..leasing.calculator import LeasingCalculator, LeasingParams
-from ..models.database import Base, CarListing, LeasingAnalysis, ScoredListing
+from ..leasing.calculator import LeasingCalculator
+from ..models.database import CarListing, LeasingAnalysis, ScoredListing
 from ..models.schemas import CarListingCreate, CarListingRead
 from ..notifications.manager import NotificationManager
 from ..scoring.market_analysis import MarketAnalyzer
@@ -64,7 +64,7 @@ async def _upsert_listing(session: AsyncSession, data: CarListingCreate) -> CarL
         )
     )
     existing = result.scalars().first()
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
 
     if existing:
         existing.last_seen_at = now
@@ -126,7 +126,7 @@ async def scrape_and_process(config: Settings, session_factory: async_sessionmak
                     score_row.is_suspicious = score_data.is_suspicious
                     score_row.market_avg_price = score_data.market_avg_price
                     score_row.price_deviation_pct = score_data.price_deviation_pct
-                    score_row.scored_at = datetime.now(tz=timezone.utc)
+                    score_row.scored_at = datetime.now(tz=UTC)
                 else:
                     score_row = ScoredListing(**score_data.model_dump())
                     session.add(score_row)
@@ -161,7 +161,7 @@ async def scrape_and_process(config: Settings, session_factory: async_sessionmak
 
 async def cleanup_stale_listings(session_factory: async_sessionmaker) -> None:
     """Mark listings not seen in the last 7 days as inactive."""
-    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=7)
+    cutoff = datetime.now(tz=UTC) - timedelta(days=7)
     async with session_factory() as session:
         result = await session.execute(
             update(CarListing)

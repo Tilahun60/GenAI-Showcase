@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncGenerator
 from datetime import datetime
-from typing import AsyncGenerator
 
 from sqlalchemy import (
     Boolean,
@@ -61,13 +61,13 @@ class CarListing(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
 
     # Relationships
-    scores: Mapped[list["ScoredListing"]] = relationship(
+    scores: Mapped[list[ScoredListing]] = relationship(
         "ScoredListing", back_populates="listing", cascade="all, delete-orphan"
     )
-    leasing_analyses: Mapped[list["LeasingAnalysis"]] = relationship(
+    leasing_analyses: Mapped[list[LeasingAnalysis]] = relationship(
         "LeasingAnalysis", back_populates="listing", cascade="all, delete-orphan"
     )
-    alert_logs: Mapped[list["AlertLog"]] = relationship(
+    alert_logs: Mapped[list[AlertLog]] = relationship(
         "AlertLog", back_populates="listing", cascade="all, delete-orphan"
     )
 
@@ -105,7 +105,7 @@ class ScoredListing(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    listing: Mapped["CarListing"] = relationship("CarListing", back_populates="scores")
+    listing: Mapped[CarListing] = relationship("CarListing", back_populates="scores")
 
 
 class LeasingAnalysis(Base):
@@ -129,7 +129,7 @@ class LeasingAnalysis(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    listing: Mapped["CarListing"] = relationship("CarListing", back_populates="leasing_analyses")
+    listing: Mapped[CarListing] = relationship("CarListing", back_populates="leasing_analyses")
 
 
 class AlertLog(Base):
@@ -149,7 +149,7 @@ class AlertLog(Base):
     success: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     message_preview: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
-    listing: Mapped["CarListing"] = relationship("CarListing", back_populates="alert_logs")
+    listing: Mapped[CarListing] = relationship("CarListing", back_populates="alert_logs")
 
 
 # ---------------------------------------------------------------------------

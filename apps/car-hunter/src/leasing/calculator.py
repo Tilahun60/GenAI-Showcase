@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import math
 from dataclasses import dataclass
 
 from ..models.schemas import CarListingCreate, CarListingRead, LeasingAnalysisCreate

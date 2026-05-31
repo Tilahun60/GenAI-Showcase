@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 SEARCH_URL = "https://www.olx.pl/motoryzacja/samochody/"
 
 
-class OlxScraper(BaseScraper):
+class OLXScraper(BaseScraper):
     """Scrapes hybrid SUV listings from OLX.pl."""
 
     source_name = "olx"

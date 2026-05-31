@@ -2,7 +2,7 @@
 from .aaa_auto import AAAAutoScraper
 from .base import BaseScraper
 from .das_weltauto import DasWeltAutoScraper
-from .olx import OlxScraper
+from .olx import OLXScraper
 from .otomoto import OtomotoScraper
 from .spoticar import SpoticarScraper
 from .toyota_pewne import ToyotaPewneScraper
@@ -10,7 +10,7 @@ from .toyota_pewne import ToyotaPewneScraper
 __all__ = [
     "BaseScraper",
     "OtomotoScraper",
-    "OlxScraper",
+    "OLXScraper",
     "AAAAutoScraper",
     "SpoticarScraper",
     "ToyotaPewneScraper",
@@ -19,7 +19,7 @@ __all__ = [
 
 ALL_SCRAPERS = [
     OtomotoScraper,
-    OlxScraper,
+    OLXScraper,
     AAAAutoScraper,
     SpoticarScraper,
     ToyotaPewneScraper,

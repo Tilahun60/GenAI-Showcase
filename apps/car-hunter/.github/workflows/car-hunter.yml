@@ -1,0 +1,99 @@
+name: Car Hunter Automation
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # Every 6 hours
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Command to run (scrape or list)"
+        required: true
+        default: scrape
+        type: choice
+        options: [scrape, list]
+
+env:
+  PYTHON_VERSION: "3.11"
+  IMAGE_NAME: car-hunter
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/car-hunter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install ruff
+        run: pip install ruff
+      - name: Run ruff
+        run: ruff check src/
+
+  scrape:
+    name: Scrape & Process
+    runs-on: ubuntu-latest
+    needs: lint
+    if: github.event_name == 'schedule' || github.event.inputs.command == 'scrape'
+    defaults:
+      run:
+        working-directory: apps/car-hunter
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: carhunter
+          POSTGRES_PASSWORD: carhunter
+          POSTGRES_DB: carhunter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Install Playwright browsers
+        run: playwright install chromium --with-deps
+
+      - name: Run scrape
+        env:
+          DB_URL: postgresql+asyncpg://carhunter:carhunter@localhost:5432/carhunter
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GMAIL_TO: ${{ secrets.GMAIL_TO }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          MAX_PRICE_PLN: "60000"
+          MIN_YEAR: "2020"
+          MAX_MILEAGE_KM: "150000"
+          ALERT_SCORE_THRESHOLD: "7.0"
+        run: python -m src.main scrape
+
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: lint
+    defaults:
+      run:
+        working-directory: apps/car-hunter
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t ${{ env.IMAGE_NAME }}:latest .
+      - name: Smoke test
+        run: docker run --rm ${{ env.IMAGE_NAME }}:latest --help || true

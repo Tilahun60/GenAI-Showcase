@@ -1,7 +1,6 @@
 """Scraper for OLX.pl Auto section."""
 from __future__ import annotations
 
-import json
 import logging
 import re
 from urllib.parse import urljoin, urlparse
@@ -62,13 +61,18 @@ class OLXScraper(BaseScraper):
         # OLX injects listing data into a __NEXT_DATA__ JSON script tag
         next_data = self._extract_next_data(soup)
         if next_data:
-            return self._parse_next_data(next_data)
+            result = self._parse_next_data(next_data)
+            if result:
+                return result
 
         # Fallback: HTML parsing
-        # OLX listing items: div[data-testid="listing-grid"] > div[data-testid="l-card"]
-        cards = soup.select("[data-testid='l-card']")
+        cards = (
+            soup.select("[data-testid='l-card']")
+            or soup.select("div[class*='css-'][data-cy='l-card']")
+            or soup.select("li[class*='offer']")
+        )
         if not cards:
-            cards = soup.select("div.css-1sw7q4x") or soup.select("li[class*='offer']")
+            logger.debug("[olx] No cards found. Page snippet: %.400s", html)
 
         for card in cards:
             try:
@@ -80,29 +84,17 @@ class OLXScraper(BaseScraper):
 
         return listings
 
-    def _extract_next_data(self, soup: BeautifulSoup) -> dict | None:
-        """Extract the __NEXT_DATA__ JSON blob from a Next.js page."""
-        script = soup.find("script", {"id": "__NEXT_DATA__"})
-        if not script or not script.string:
-            return None
-        try:
-            return json.loads(script.string)
-        except json.JSONDecodeError:
-            return None
-
     def _parse_next_data(self, data: dict) -> list[CarListingCreate]:
-        """Parse listings from OLX's __NEXT_DATA__ JSON structure."""
+        """Parse listings from OLX's __NEXT_DATA__ JSON (handles multiple schema versions)."""
         listings: list[CarListingCreate] = []
         try:
-            # Navigate the Next.js data tree
-            props = data.get("props", {})
-            page_props = props.get("pageProps", {})
-            # OLX stores ads under different keys depending on version
-            ads = (
-                page_props.get("ads")
-                or page_props.get("listing", {}).get("ads")
-                or []
-            )
+            page_props = data.get("props", {}).get("pageProps", {})
+            ads = self._find_ads_in_json(page_props)
+            if not ads:
+                return []
+            # Unwrap GraphQL edges/node pattern
+            if ads and isinstance(ads[0], dict) and "node" in ads[0]:
+                ads = [item["node"] for item in ads if isinstance(item, dict) and "node" in item]
             for ad in ads:
                 try:
                     listing = self._parse_ad_dict(ad)

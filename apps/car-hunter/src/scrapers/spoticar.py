@@ -13,7 +13,15 @@ from .base import BaseScraper
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://www.spoticar.pl"
-SEARCH_URL = f"{BASE_URL}/used-cars"
+
+# Spoticar has migrated to Polish URL paths; try both in order
+SEARCH_URL_CANDIDATES = [
+    f"{BASE_URL}/pl/samochody-uzywane",
+    f"{BASE_URL}/pl/used-cars",
+    f"{BASE_URL}/used-cars",
+]
+
+SEARCH_URL = SEARCH_URL_CANDIDATES[0]
 
 
 class SpoticarScraper(BaseScraper):
@@ -30,16 +38,22 @@ class SpoticarScraper(BaseScraper):
     }
 
     async def scrape(self) -> list[CarListingCreate]:
-        """Scrape Spoticar listings."""
+        """Scrape Spoticar listings, trying URL candidates until one succeeds."""
         listings: list[CarListingCreate] = []
-        page = 1
-        max_pages = 6
 
         async with self:
+            # Find a working URL
+            working_url = await self._resolve_search_url()
+            if not working_url:
+                logger.warning("[spoticar] No working search URL found")
+                return listings
+
+            page = 1
+            max_pages = 6
             while page <= max_pages:
                 params = {**self.DEFAULT_PARAMS, "page": str(page)}
                 try:
-                    html = await self._fetch_page(SEARCH_URL, params=params)
+                    html = await self._fetch_page(working_url, params=params)
                     page_listings = self._parse_page(html)
                     if not page_listings:
                         logger.info("[spoticar] No more listings at page %d", page)
@@ -53,6 +67,18 @@ class SpoticarScraper(BaseScraper):
 
         logger.info("[spoticar] Total scraped: %d listings", len(listings))
         return listings
+
+    async def _resolve_search_url(self) -> str | None:
+        """Return the first URL candidate that responds with 200."""
+        for url in SEARCH_URL_CANDIDATES:
+            try:
+                html = await self._fetch_page(url)
+                if html:
+                    logger.info("[spoticar] Using search URL: %s", url)
+                    return url
+            except Exception as exc:
+                logger.debug("[spoticar] URL %s failed: %s", url, exc)
+        return None
 
     def _parse_page(self, html: str) -> list[CarListingCreate]:
         """Parse Spoticar search results page."""

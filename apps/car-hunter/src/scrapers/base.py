@@ -1,6 +1,8 @@
 """Abstract base scraper with shared HTTP and parsing utilities."""
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import random
 import re
@@ -8,6 +10,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import httpx
+from bs4 import BeautifulSoup
 from tenacity import (
     before_sleep_log,
     retry,
@@ -195,3 +198,67 @@ class BaseScraper(ABC):
         if "dealer" in raw_lower or "firma" in raw_lower or "salon" in raw_lower:
             return "dealer"
         return "private"
+
+    # ------------------------------------------------------------------
+    # Next.js / JSON helpers
+    # ------------------------------------------------------------------
+
+    def _extract_next_data(self, soup: BeautifulSoup) -> dict | None:
+        """Extract the __NEXT_DATA__ JSON blob from a Next.js page."""
+        script = soup.find("script", {"id": "__NEXT_DATA__"})
+        if not script or not script.string:
+            return None
+        try:
+            return json.loads(script.string)
+        except json.JSONDecodeError:
+            return None
+
+    def _find_ads_in_json(self, data: Any, depth: int = 0) -> list[dict]:
+        """Recursively search a JSON tree for a list of ad-like objects."""
+        if depth > 10:
+            return []
+        if isinstance(data, list):
+            if data and self._looks_like_ads(data):
+                return data
+            for item in data:
+                if isinstance(item, (dict, list)):
+                    result = self._find_ads_in_json(item, depth + 1)
+                    if result:
+                        return result
+            return []
+        if isinstance(data, dict):
+            for key in ("ads", "listings", "adverts", "edges", "nodes", "items", "results"):
+                val = data.get(key)
+                if isinstance(val, list) and val and self._looks_like_ads(val):
+                    return val
+            for val in data.values():
+                if isinstance(val, (dict, list)):
+                    result = self._find_ads_in_json(val, depth + 1)
+                    if result:
+                        return result
+        return []
+
+    def _looks_like_ads(self, lst: list) -> bool:
+        """Heuristic: does this list look like a collection of car ads?"""
+        if not lst or not isinstance(lst[0], dict):
+            return False
+        item = lst[0]
+        if "node" in item and isinstance(item["node"], dict):
+            item = item["node"]
+        has_ref = "url" in item or "href" in item or "id" in item
+        has_content = "title" in item or "name" in item or "price" in item
+        return has_ref and has_content
+
+    # ------------------------------------------------------------------
+    # String / ID helpers (used by toyota_pewne, das_weltauto)
+    # ------------------------------------------------------------------
+
+    def _clean_str(self, text: str) -> str:
+        return " ".join(text.split()) if text else ""
+
+    def _parse_year(self, text: str) -> int:
+        match = re.search(r"\b(20\d{2})\b", text)
+        return int(match.group(1)) if match else 2020
+
+    def _slugify_to_id(self, url: str) -> str:
+        return hashlib.md5(url.encode()).hexdigest()[:12]

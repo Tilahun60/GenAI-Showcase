@@ -11,7 +11,10 @@ from .base import BaseScraper
 
 logger = logging.getLogger(__name__)
 
-SEARCH_URL = "https://pewneauto.toyota.pl/samochody"
+SEARCH_URL_CANDIDATES = [
+    "https://pewneauto.toyota.pl/samochody",
+    "https://www.toyota.pl/samochody-uzywane",
+]
 
 PARAMS = {
     "nadwozie": "SUV",
@@ -28,20 +31,40 @@ class ToyotaPewneScraper(BaseScraper):
 
     async def scrape(self) -> list[CarListingCreate]:
         listings: list[CarListingCreate] = []
-        page = 1
         async with self:
+            working_url = await self._resolve_url()
+            if not working_url:
+                logger.warning("[toyota_pewne] All URL candidates failed (DNS/network issue)")
+                return listings
+
+            page = 1
             while True:
                 params = {**PARAMS, "strona": str(page)}
-                html = await self._fetch_page(SEARCH_URL, params=params)
+                try:
+                    html = await self._fetch_page(working_url, params=params)
+                except Exception as exc:
+                    logger.error("[toyota_pewne] Fetch error page %d: %s", page, exc)
+                    break
                 if not html:
                     break
                 page_listings, has_next = self._parse_page(html)
                 listings.extend(page_listings)
-                logger.info("Toyota Pewne page %d: %d listings", page, len(page_listings))
+                logger.info("[toyota_pewne] Page %d: %d listings", page, len(page_listings))
                 if not has_next or page >= 10:
                     break
                 page += 1
         return listings
+
+    async def _resolve_url(self) -> str | None:
+        for url in SEARCH_URL_CANDIDATES:
+            try:
+                html = await self._fetch_page(url)
+                if html:
+                    logger.info("[toyota_pewne] Using URL: %s", url)
+                    return url
+            except Exception as exc:
+                logger.debug("[toyota_pewne] %s failed: %s", url, exc)
+        return None
 
     def _parse_page(self, html: str) -> tuple[list[CarListingCreate], bool]:
         soup = BeautifulSoup(html, "lxml")

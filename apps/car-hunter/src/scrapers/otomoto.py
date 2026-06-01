@@ -14,9 +14,6 @@ logger = logging.getLogger(__name__)
 
 SEARCH_URL = "https://www.otomoto.pl/osobowe/uzywane"
 
-# Otomoto uses a GraphQL-like JSON embedded in a <script> tag named __NEXT_DATA__
-# We parse it for reliable data extraction.
-
 
 class OtomotoScraper(BaseScraper):
     """Scrapes hybrid SUV listings from Otomoto.pl."""
@@ -60,24 +57,128 @@ class OtomotoScraper(BaseScraper):
     def _parse_search_page(self, html: str) -> list[CarListingCreate]:
         """Parse a search results page and return listings."""
         soup = BeautifulSoup(html, "lxml")
-        listings: list[CarListingCreate] = []
 
-        # Otomoto renders listing cards with data-testid="listing-ad"
-        # or article tags with specific class patterns
-        articles = soup.select("article[data-testid='listing-ad']")
+        # Try __NEXT_DATA__ JSON first — Otomoto is a Next.js app
+        next_data = self._extract_next_data(soup)
+        if next_data:
+            listings = self._parse_next_data(next_data)
+            if listings:
+                logger.debug("[otomoto] Parsed %d listings from __NEXT_DATA__", len(listings))
+                return listings
+
+        # HTML fallback
+        articles = (
+            soup.select("article[data-testid='listing-ad']")
+            or soup.select("article[class*='ooa-']")
+            or soup.select("article[class*='listing']")
+            or soup.select("div[data-testid='listing-ad']")
+        )
         if not articles:
-            # Fallback: look for any article with a link and price
-            articles = soup.select("article.ooa-yca59n") or soup.select("article[class*='listing']")
+            logger.debug("[otomoto] No articles found. Page snippet: %.400s", html)
 
+        listings = []
         for article in articles:
             try:
                 listing = self._parse_article(article)
                 if listing:
                     listings.append(listing)
             except Exception as exc:
-                logger.debug("[otomoto] Skipping article due to error: %s", exc)
-
+                logger.debug("[otomoto] Skipping article: %s", exc)
         return listings
+
+    def _parse_next_data(self, data: dict) -> list[CarListingCreate]:
+        """Parse listings from Otomoto's __NEXT_DATA__ JSON (handles multiple schema versions)."""
+        page_props = data.get("props", {}).get("pageProps", {})
+        ads = self._find_ads_in_json(page_props)
+        if not ads:
+            return []
+        # Unwrap GraphQL edges/node pattern
+        if ads and isinstance(ads[0], dict) and "node" in ads[0]:
+            ads = [item["node"] for item in ads if isinstance(item, dict) and "node" in item]
+        listings = []
+        for ad in ads:
+            try:
+                listing = self._parse_ad_dict(ad)
+                if listing:
+                    listings.append(listing)
+            except Exception as exc:
+                logger.debug("[otomoto] Skipping JSON ad: %s", exc)
+        return listings
+
+    def _parse_ad_dict(self, ad: dict) -> CarListingCreate | None:
+        """Parse a single ad from Otomoto JSON data."""
+        url = ad.get("url") or ad.get("href") or ad.get("seoPath") or ""
+        if not url:
+            return None
+        if not url.startswith("http"):
+            url = urljoin("https://www.otomoto.pl", url)
+
+        external_id = self._extract_external_id(url) or str(ad.get("id", ""))
+        if not external_id:
+            return None
+
+        title = ad.get("title") or ad.get("name") or ""
+
+        # Price — multiple JSON shapes across Otomoto API versions
+        price_info = ad.get("price") or {}
+        price = 0.0
+        if isinstance(price_info, dict):
+            amount = price_info.get("amount") or {}
+            if isinstance(amount, dict):
+                price = float(amount.get("units") or amount.get("value") or 0)
+            else:
+                price = float(amount or 0)
+            if price <= 0:
+                price = self._parse_price(str(price_info.get("gross") or price_info.get("value") or ""))
+        if price <= 0:
+            price = self._parse_price(str(price_info))
+        if price <= 0:
+            return None
+
+        params = ad.get("params") or ad.get("parameters") or []
+        param_map: dict[str, str] = {}
+        for p in params:
+            if not isinstance(p, dict):
+                continue
+            key = (p.get("key") or "").lower()
+            val = p.get("value") or {}
+            label = val.get("label") or val.get("key") or "" if isinstance(val, dict) else str(val)
+            if key and label:
+                param_map[key] = str(label)
+
+        year_str = param_map.get("year") or param_map.get("rok_produkcji") or ""
+        year = int(re.sub(r"\D", "", year_str)) if re.search(r"\d{4}", year_str) else 2020
+
+        mileage = self._parse_mileage(param_map.get("mileage") or param_map.get("przebieg") or "")
+        fuel_raw = param_map.get("fuel_type") or param_map.get("paliwo") or ""
+        fuel_type = self._normalize_fuel(fuel_raw) if fuel_raw else "hybrid"
+        trans_raw = param_map.get("gearbox") or param_map.get("skrzynia_biegow") or ""
+        transmission = self._normalize_transmission(trans_raw) if trans_raw else "automatic"
+        body_raw = param_map.get("body_type") or param_map.get("typ_nadwozia") or ""
+        body_type = self._normalize_body(body_raw) if body_raw else "suv"
+
+        location_info = ad.get("location") or {}
+        if isinstance(location_info, dict):
+            city = location_info.get("city") or location_info.get("cityName") or {}
+            location = city.get("name") if isinstance(city, dict) else str(city)
+        else:
+            location = str(location_info)
+
+        is_dealer = ad.get("isBusinessSeller") or ad.get("isBusiness") or False
+        seller_type = "dealer" if is_dealer else "private"
+        make, model = self._extract_make_model(title)
+
+        return CarListingCreate(
+            source=self.source_name,
+            external_id=external_id,
+            url=url,
+            title=title or f"{make} {model} {year}",
+            make=make, model=model, year=year,
+            price_pln=price, mileage_km=mileage,
+            fuel_type=fuel_type, transmission=transmission, body_type=body_type,
+            accident_history=None, seller_type=seller_type, location=location or "",
+            raw_data={"source_page": SEARCH_URL},
+        )
 
     def _parse_article(self, article) -> CarListingCreate | None:
         """Parse a single listing article element."""

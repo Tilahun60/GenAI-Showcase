@@ -19,6 +19,7 @@ class OtomotoScraper(BaseScraper):
     """Scrapes hybrid SUV listings from Otomoto.pl."""
 
     source_name = "otomoto"
+    use_browser = True
     base_url = SEARCH_URL
 
     # Otomoto query params for filtering

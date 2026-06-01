@@ -28,6 +28,7 @@ class SpoticarScraper(BaseScraper):
     """Scrapes hybrid SUV listings from Spoticar.pl (Stellantis certified used)."""
 
     source_name = "spoticar"
+    use_browser = True
     base_url = SEARCH_URL
 
     DEFAULT_PARAMS = {

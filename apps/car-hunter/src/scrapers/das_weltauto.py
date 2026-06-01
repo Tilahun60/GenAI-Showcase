@@ -26,6 +26,7 @@ PARAMS = {
 
 class DasWeltAutoScraper(BaseScraper):
     source_name = "das_weltauto"
+    use_browser = True
 
     async def scrape(self) -> list[CarListingCreate]:
         listings: list[CarListingCreate] = []

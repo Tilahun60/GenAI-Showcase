@@ -19,6 +19,7 @@ class OLXScraper(BaseScraper):
     """Scrapes hybrid SUV listings from OLX.pl."""
 
     source_name = "olx"
+    use_browser = True
     base_url = SEARCH_URL
 
     DEFAULT_PARAMS = {

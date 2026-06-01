@@ -134,17 +134,43 @@ async def cmd_list(config) -> None:
     await engine.dispose()
 
 
+async def cmd_dump(_config) -> None:
+    """Fetch page 1 from every scraper and save HTML to debug_html/ for selector debugging."""
+    from pathlib import Path
+
+    from .scrapers import ALL_SCRAPERS
+
+    out_dir = Path("debug_html")
+    out_dir.mkdir(exist_ok=True)
+
+    for ScraperClass in ALL_SCRAPERS:
+        scraper = ScraperClass()
+        source = scraper.source_name
+        try:
+            async with scraper:
+                html = await scraper._fetch_page(scraper.base_url)
+            dest = out_dir / f"{source}.html"
+            dest.write_text(html, encoding="utf-8")
+            console.print(f"[green]{source}[/green] → {dest} ({len(html):,} bytes)")
+        except Exception as exc:
+            console.print(f"[red]{source}[/red] failed: {exc}")
+
+    console.print(f"\nHTML files saved to [bold]{out_dir.resolve()}[/bold]")
+    console.print("Inspect them to find the correct CSS selectors / __NEXT_DATA__ structure.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Car Hunter — automated Polish used-car monitor")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("run", help="Start scheduler (runs indefinitely)")
     sub.add_parser("scrape", help="Run one scrape cycle and exit")
     sub.add_parser("list", help="Print top 20 listings by reliability score")
+    sub.add_parser("dump", help="Fetch page 1 from every source and save HTML for debugging")
 
     args = parser.parse_args()
     config = get_settings()
 
-    commands = {"run": cmd_run, "scrape": cmd_scrape, "list": cmd_list}
+    commands = {"run": cmd_run, "scrape": cmd_scrape, "list": cmd_list, "dump": cmd_dump}
     with contextlib.suppress(KeyboardInterrupt):
         asyncio.run(commands[args.command](config))
 

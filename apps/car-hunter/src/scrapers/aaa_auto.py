@@ -20,6 +20,7 @@ class AAAAutoScraper(BaseScraper):
     """Scrapes listings from AAA Auto Poland (dealer-only, certified used cars)."""
 
     source_name = "aaa_auto"
+    use_browser = True
     base_url = SEARCH_URL
 
     DEFAULT_PARAMS = {
